@@ -1,26 +1,33 @@
-import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCirclePlay } from '@fortawesome/free-solid-svg-icons';
-import { Link, useParams } from 'react-router-dom';
-import SongList from '../components/SongList';
-import { artistArray } from '../assets/database/artists';
-import { songsArray } from '../assets/database/songs';
+import React from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCirclePlay } from "@fortawesome/free-solid-svg-icons";
+import { Link, useParams } from "react-router-dom";
+import SongList from "../components/SongList";
+import { artistArray } from "../assets/database/artists";
+import { songsArray } from "../assets/database/songs";
 
 const Artist = () => {
   const { id } = useParams();
+  // console.log(useParams());
 
   const { name, banner } = artistArray.filter(
-    (currentArtistObj, index) => currentArtistObj.id === Number(id)
+    (currentArtistObj) => currentArtistObj._id === id
   )[0];
 
   const songsArrayFromArtist = songsArray.filter(
-    (currentSongsObj, index) => currentSongsObj.artist === name
+    (currentSongObj) => currentSongObj.artist === name
   );
 
   const randomIndex = Math.floor(
-    Math.random() * songsArrayFromArtist.length - 1
+    Math.random() * (songsArrayFromArtist.length - 1)
   );
-  const randomIdFromArtist = songsArrayFromArtist[randomIndex].id;
+  const randomIdFromArtist = songsArrayFromArtist[randomIndex]._id;
+
+  // console.log(randomIdFromArtist);
+  // console.log(Math.floor(Math.random() * (songsArrayFromArtist.length - 1)));
+  // console.log("Tamanho do Array:" + songsArrayFromArtist.length);
+
+  // console.log(songsArrayFromArtist);
 
   return (
     <div className="artist">
@@ -32,13 +39,16 @@ const Artist = () => {
       >
         <h2 className="artist__title">{name}</h2>
       </div>
+
       <div className="artist__body">
         <h2>Populares</h2>
+
         <SongList songsArray={songsArrayFromArtist} />
       </div>
+
       <Link to={`/song/${randomIdFromArtist}`}>
         <FontAwesomeIcon
-          className="single-item__icon single-item__icon--artist "
+          className="single-item__icon single-item__icon--artist"
           icon={faCirclePlay}
         />
       </Link>
