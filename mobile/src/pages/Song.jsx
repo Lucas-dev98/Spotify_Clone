@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Image, ScrollView, StyleSheet } from 'react-native';
 import Header from '../components/Header';
 import Player from '../components/Player';
+import SpotifyWebPlaybackPlayer from '../components/SpotifyWebPlaybackPlayer';
 import theme from '../theme';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -41,7 +42,13 @@ export default function Song({ route }) {
 
           {song.audio || song.previewUrl ? (
             <View style={styles.playerContainer}>
-              <Player source={song.audio || song.previewUrl} title={song.name} />
+              {song.uri && song.uri.startsWith('spotify:track:') ? (
+                // Use Spotify Web Playback for full track
+                <SpotifyWebPlaybackPlayer source={song.uri} title={song.name} />
+              ) : (
+                // Fallback to HTTP audio (Deezer preview)
+                <Player source={song.audio || song.previewUrl} title={song.name} />
+              )}
             </View>
           ) : (
             <View style={styles.noAudioContainer}>

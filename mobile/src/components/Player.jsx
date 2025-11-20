@@ -104,7 +104,8 @@ export default function Player({ source, title }) {
       audio.src = source;
 
       audio.onloadedmetadata = () => {
-        console.log('[Player Web] Audio loaded. Duration:', audio.duration);
+        console.log('[Player Web] Audio loaded. Duration:', audio.duration, 'seconds');
+        console.log('[Player Web] Duration in ms:', audio.duration * 1000);
         setDuration(audio.duration * 1000);
         setIsLoading(false);
         setError(null);
@@ -121,13 +122,17 @@ export default function Player({ source, title }) {
       };
       
       audio.onended = () => {
-        console.log('[Player Web] Ended');
+        console.log('[Player Web] Track ended at:', audio.currentTime, 'seconds');
+        console.log('[Player Web] Total duration was:', audio.duration, 'seconds');
         setIsPlaying(false);
         setPosition(audio.duration * 1000);
       };
 
       audio.ontimeupdate = () => {
         setPosition(audio.currentTime * 1000);
+        if (audio.currentTime > audio.duration - 0.5) {
+          console.log('[Player Web] Near end - Current:', audio.currentTime, 'Duration:', audio.duration);
+        }
       };
 
       audio.onerror = (e) => {
