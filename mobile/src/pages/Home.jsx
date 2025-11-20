@@ -5,6 +5,10 @@ import Main from '../components/Main';
 import { getNewReleases, searchTracks } from '../services/spotifyApi';
 import { artistArray as localArtists } from '../assets/database/artists';
 import { songsArray as localSongs } from '../assets/database/songs';
+import theme from '../theme';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
+import { spacing } from '../theme/spacing';
 
 export default function Home() {
   const [artists, setArtists] = useState(localArtists);
@@ -18,22 +22,19 @@ export default function Home() {
         setError(null);
         console.log('[Home] Fetching from Spotify API...');
         
-        // Fetch new releases (which includes albums/artists)
         const spotifyReleases = await getNewReleases(30);
         
-        // Transform releases to song format for compatibility
         const transformedSongs = spotifyReleases.map((release, idx) => ({
           id: release.id || idx,
           name: release.name,
           artist: release.artist,
           image: release.image,
           duration: '3:00',
-          audio: null, // Releases don't have preview URLs, we'll use search for playable tracks
+          audio: null,
           album: release.name,
           uri: release.uri,
         }));
 
-        // Also fetch some popular tracks for playable audio
         try {
           const popularTracks = await searchTracks('top tracks', 15);
           setSongs(popularTracks);
@@ -42,7 +43,6 @@ export default function Home() {
           setSongs(transformedSongs.slice(0, 20));
         }
 
-        // Create artist list from songs
         const uniqueArtists = [];
         const artistSet = new Set();
         
@@ -75,25 +75,66 @@ export default function Home() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+      <View style={styles.loadingContainer}>
         <Header title="Spotify" />
-        <ActivityIndicator size="large" color="#1db954" />
-        <Text style={{ marginTop: 16, color: '#000' }}>Conectando ao Spotify...</Text>
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Conectando ao Spotify...</Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <Header title="Spotify" />
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+    <View style={styles.container}>
+      <Header title="Spotify" subtitle="Descubra música nova" />
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {error && (
-          <Text style={{ padding: 12, backgroundColor: '#fff3cd', color: '#856404', marginBottom: 12, marginHorizontal: 12 }}>
-            ⚠️ Aviso: {error}
-          </Text>
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>⚠️ {error}</Text>
+          </View>
         )}
         <Main artists={artists} songs={songs} />
       </ScrollView>
     </View>
   );
 }
+
+const styles = {
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  scrollContent: {
+    paddingBottom: 120,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  loadingContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...typography.bodyMedium,
+    color: colors.text.secondary,
+    marginTop: spacing.lg,
+  },
+  errorBanner: {
+    backgroundColor: colors.error,
+    marginHorizontal: spacing.lg,
+    marginVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: theme.borderRadius.md,
+  },
+  errorText: {
+    ...typography.bodySmall,
+    color: colors.text.primary,
+  },
+};

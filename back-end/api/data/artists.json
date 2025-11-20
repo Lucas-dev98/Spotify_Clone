@@ -1,0 +1,23 @@
+[
+  {
+    "_id": "1",
+    "id": 1,
+    "image": "https://i.scdn.co/image/ab676161000051744dcd8a3bff84cd7703892cf4",
+    "name": "Henrique & Juliano",
+    "banner": "https://i.scdn.co/image/ab67618600001016b37fbcbd078cb239588df5d9"
+  },
+  {
+    "_id": "2",
+    "id": 2,
+    "image": "https://i.scdn.co/image/ab6761610000517499c26e8fb91634b00764bbb9",
+    "name": "MC Tuto",
+    "banner": "https://www.hashtagtreinamentos.com/wp-content/uploads/2025/02/mc-tuto.png"
+  },
+  {
+    "_id": "3",
+    "id": 3,
+    "image": "https://i.scdn.co/image/ab6761610000517477937baabc49dea13c17c706",
+    "name": "Jorge & Mateus",
+    "banner": "https://i.scdn.co/image/ab67618600001016e2952bec9cfd4e6862e23607"
+  }
+]

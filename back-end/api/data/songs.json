@@ -1,0 +1,29 @@
+[
+  {
+    "_id": "1",
+    "id": 1,
+    "image": "https://i.scdn.co/image/ab67616d00001e022774b00531d558bc19e12a24",
+    "name": "Última Saudade - Ao Vivo",
+    "duration": "02:30",
+    "artist": "Henrique & Juliano",
+    "audio": "https://jornada-fullstack.s3.us-east-2.amazonaws.com/ultima-saudade.mp3"
+  },
+  {
+    "_id": "2",
+    "id": 2,
+    "image": "https://i.scdn.co/image/ab67616d00001e02af41105c5cd91b28f2cf219d",
+    "name": "Xonei",
+    "duration": "02:34",
+    "artist": "Henrique & Juliano",
+    "audio": "https://jornada-fullstack.s3.us-east-2.amazonaws.com/ultima-saudade.mp3"
+  },
+  {
+    "_id": "11",
+    "id": 11,
+    "image": "https://i.scdn.co/image/ab67616d00001e02d8bfb4567b1b5e5bc4da915b",
+    "name": "Oh Garota Eu Quero Você Só Pra Mim",
+    "duration": "02:46",
+    "artist": "MC Tuto",
+    "audio": "https://jornada-fullstack.s3.us-east-2.amazonaws.com/barbie.mp3"
+  }
+]

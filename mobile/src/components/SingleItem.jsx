@@ -1,6 +1,10 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import theme from '../theme';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
+import { spacing } from '../theme/spacing';
 
 export default function SingleItem({ id, name, image, banner, artist, idPath }) {
   const navigation = useNavigation();
@@ -12,32 +16,54 @@ export default function SingleItem({ id, name, image, banner, artist, idPath }) 
   };
 
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress}>
+    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
       <Image 
         source={{ uri: image }} 
         style={styles.image}
       />
-      <View style={styles.texts}>
-        <Text style={styles.title} numberOfLines={2}>{name}</Text>
-        <Text style={styles.type} numberOfLines={1}>{artist ?? 'Artista'}</Text>
+      <View style={styles.content}>
+        <Text style={styles.title} numberOfLines={1}>{name}</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>{artist ?? 'Artista'}</Text>
       </View>
+      <Text style={styles.arrow}>›</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#fff',
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
   },
-  image: { width: 60, height: 60, borderRadius: 8, marginRight: 12 },
-  texts: { flex: 1 },
-  title: { fontSize: 14, fontWeight: '700', color: '#000' },
-  type: { fontSize: 12, color: '#666', marginTop: 4 },
+  image: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.borderRadius.md,
+    marginRight: spacing.md,
+    backgroundColor: colors.skeleton,
+  },
+  content: {
+    flex: 1,
+  },
+  title: {
+    ...typography.bodyMedium,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  subtitle: {
+    ...typography.bodySmall,
+    color: colors.text.secondary,
+  },
+  arrow: {
+    ...typography.headingSmall,
+    color: colors.text.tertiary,
+    marginLeft: spacing.md,
+  },
 });
 

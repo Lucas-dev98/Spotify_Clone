@@ -2,6 +2,10 @@ import React from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import SingleItem from './SingleItem';
 import { useNavigation } from '@react-navigation/native';
+import theme from '../theme';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
+import { spacing } from '../theme/spacing';
 
 export default function ItemList({ title, items = 10, itemsArray = [], path = 'Artists', idPath = '/artist' }) {
   const navigation = useNavigation();
@@ -12,17 +16,23 @@ export default function ItemList({ title, items = 10, itemsArray = [], path = 'A
         <View style={styles.header}>
           <Text style={styles.title}>{title} populares</Text>
         </View>
-        <Text style={{ paddingHorizontal: 12, color: '#999' }}>Nenhum item disponível</Text>
+        <Text style={styles.emptyText}>Nenhum item disponível</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{title} populares</Text>
-        <TouchableOpacity onPress={() => navigation.navigate(path)}>
-          <Text style={styles.link}>Mostrar tudo</Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>{title} populares</Text>
+          <Text style={styles.subtitle}>Descubra novos favoritos</Text>
+        </View>
+        <TouchableOpacity 
+          onPress={() => navigation.navigate(path)}
+          style={styles.viewAllButton}
+        >
+          <Text style={styles.viewAllText}>Ver tudo</Text>
         </TouchableOpacity>
       </View>
 
@@ -39,9 +49,43 @@ export default function ItemList({ title, items = 10, itemsArray = [], path = 'A
 }
 
 const styles = StyleSheet.create({
-  container: { paddingVertical: 12, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, marginBottom: 8 },
-  title: { fontSize: 16, fontWeight: '700', color: '#000' },
-  link: { color: '#1db954', fontWeight: '700', fontSize: 13 },
+  container: {
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.background,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  title: {
+    ...typography.headingSmall,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  subtitle: {
+    ...typography.bodySmall,
+    color: colors.text.secondary,
+  },
+  viewAllButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceHover,
+    borderRadius: theme.borderRadius.md,
+  },
+  viewAllText: {
+    ...typography.label,
+    color: colors.primary,
+  },
+  emptyText: {
+    ...typography.bodySmall,
+    color: colors.text.secondary,
+    paddingHorizontal: spacing.lg,
+  },
 });
 

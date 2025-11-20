@@ -239,9 +239,9 @@ export default function Player({ source, title }) {
               window.open(`https://open.spotify.com/track/${trackId}`, '_blank');
             }
           }}
-          style={[styles.button, { backgroundColor: '#1db954' }]}
+          style={[styles.button, styles.spotifyButton]}
         >
-          <Text style={styles.buttonText}>Abrir</Text>
+          <Text style={styles.buttonText}>🎵 Abrir</Text>
         </TouchableOpacity>
       ) : (
         <TouchableOpacity 
@@ -250,7 +250,7 @@ export default function Player({ source, title }) {
           disabled={isLoading || !audioElement.current}
         >
           <Text style={styles.buttonText}>
-            {isLoading ? '⟳' : isPlaying ? '⏸' : '▶️'}
+            {isLoading ? '⟳' : isPlaying ? '⏸️' : '▶️'}
           </Text>
         </TouchableOpacity>
       )}
@@ -258,48 +258,60 @@ export default function Player({ source, title }) {
   );
 }
 
+const theme = require('../theme').default;
+const { colors } = require('../theme/colors');
+const { typography } = require('../theme/typography');
+const { spacing } = require('../theme/spacing');
+
 const styles = StyleSheet.create({
-  container: { 
-    padding: 12, 
-    borderTopWidth: 1, 
-    borderColor: '#eee', 
-    backgroundColor: '#fafafa', 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between' 
+  container: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surfaceLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  info: { 
-    flex: 1, 
-    marginRight: 12 
+  info: {
+    flex: 1,
+    marginRight: spacing.lg,
   },
-  title: { 
-    fontSize: 14, 
+  title: {
+    ...typography.bodyMedium,
     fontWeight: '600',
-    marginBottom: 4
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
   },
-  time: { 
-    fontSize: 12, 
-    color: '#999'
+  time: {
+    ...typography.bodySmall,
+    color: colors.text.secondary,
   },
-  button: { 
-    backgroundColor: '#1db954', 
-    paddingVertical: 8, 
-    paddingHorizontal: 14, 
-    borderRadius: 6,
+  button: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: theme.borderRadius.md,
     minWidth: 50,
-    alignItems: 'center'
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spotifyButton: {
+    backgroundColor: colors.primary,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc'
+    backgroundColor: colors.disabled,
+    opacity: 0.6,
   },
-  buttonText: { 
-    color: '#fff', 
-    fontWeight: '700',
-    fontSize: 16
+  buttonText: {
+    ...typography.label,
+    color: colors.text.primary,
+    fontSize: 16,
   },
   error: {
-    fontSize: 12,
-    color: '#d32f2f',
-    marginTop: 4
-  }
+    ...typography.bodySmall,
+    color: colors.error,
+    marginTop: spacing.xs,
+  },
 });

@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Spotify Mobile",
+    "slug": "spotify-mobile",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "android": {
+      "package": "com.lucasoliverb98.spotifymobile"
+    },
+    "ios": {
+      "supportsTabletMode": true
+    },
+    "extra": {
+      "SPOTIFY_CLIENT_ID": "031e7c3ae27041cc8e930273af160b87",
+      "SPOTIFY_CLIENT_SECRET": "181c195a47754e6e88e8ad6e1f7cda6a"
+    }
+  }
+}
+
