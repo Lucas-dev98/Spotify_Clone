@@ -1,7 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Animated } from 'react-native';
 // Only import Audio for native platforms
 const Audio = Platform.OS !== 'web' ? require('expo-audio').Audio : null;
+import theme from '../theme';
+
+// Skip constants (in milliseconds)
+const SKIP_FORWARD = 10000;  // 10 seconds
+const SKIP_BACKWARD = 10000; // 10 seconds
 
 export default function Player({ source, title }) {
   const sound = useRef(null);
@@ -11,6 +16,7 @@ export default function Player({ source, title }) {
   const [position, setPosition] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // On web, use HTML5 audio
@@ -213,6 +219,38 @@ export default function Player({ source, title }) {
     }
   }
 
+  async function skipForward() {
+    const newPosition = Math.min(position + SKIP_FORWARD, duration);
+    
+    if (Platform.OS === 'web' && audioElement.current) {
+      audioElement.current.currentTime = newPosition / 1000;
+      setPosition(newPosition);
+    } else if (sound.current) {
+      try {
+        await sound.current.setPositionAsync(newPosition);
+        setPosition(newPosition);
+      } catch (e) {
+        console.warn('[Player] Error skipping forward:', e.message);
+      }
+    }
+  }
+
+  async function skipBackward() {
+    const newPosition = Math.max(position - SKIP_BACKWARD, 0);
+    
+    if (Platform.OS === 'web' && audioElement.current) {
+      audioElement.current.currentTime = newPosition / 1000;
+      setPosition(newPosition);
+    } else if (sound.current) {
+      try {
+        await sound.current.setPositionAsync(newPosition);
+        setPosition(newPosition);
+      } catch (e) {
+        console.warn('[Player] Error skipping backward:', e.message);
+      }
+    }
+  }
+
   function formatTime(ms) {
     if (!ms) return '0:00';
     const secs = Math.floor(ms / 1000);
@@ -223,6 +261,7 @@ export default function Player({ source, title }) {
 
   return (
     <View style={styles.container}>
+      {/* Título e Info */}
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
         <Text style={styles.time}>
@@ -230,8 +269,10 @@ export default function Player({ source, title }) {
         </Text>
         {error && <Text style={styles.error}>{error}</Text>}
       </View>
-      
+
+      {/* Controles */}
       {source && source.startsWith('spotify:') ? (
+        // Spotify URI - Link to Spotify
         <TouchableOpacity 
           onPress={() => {
             const trackId = source.replace('spotify:track:', '');
@@ -244,21 +285,43 @@ export default function Player({ source, title }) {
           <Text style={styles.buttonText}>🎵 Abrir</Text>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity 
-          onPress={toggle} 
-          style={[styles.button, (isLoading || !audioElement.current) && styles.buttonDisabled]}
-          disabled={isLoading || !audioElement.current}
-        >
-          <Text style={styles.buttonText}>
-            {isLoading ? '⟳' : isPlaying ? '⏸️' : '▶️'}
-          </Text>
-        </TouchableOpacity>
+        // Full player controls
+        <View style={styles.controlsContainer}>
+          {/* Skip Backward */}
+          <TouchableOpacity 
+            onPress={skipBackward}
+            disabled={isLoading || !audioElement.current}
+            style={[styles.controlButton, (isLoading || !audioElement.current) && styles.controlButtonDisabled]}
+          >
+            <Text style={styles.controlButtonText}>⏮️</Text>
+          </TouchableOpacity>
+
+          {/* Play/Pause */}
+          <TouchableOpacity 
+            onPress={toggle} 
+            style={[styles.playButton, (isLoading || !audioElement.current) && styles.playButtonDisabled]}
+            disabled={isLoading || !audioElement.current}
+          >
+            <Text style={styles.playButtonText}>
+              {isLoading ? '⟳' : isPlaying ? '⏸️' : '▶️'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Skip Forward */}
+          <TouchableOpacity 
+            onPress={skipForward}
+            disabled={isLoading || !audioElement.current}
+            style={[styles.controlButton, (isLoading || !audioElement.current) && styles.controlButtonDisabled]}
+          >
+            <Text style={styles.controlButtonText}>⏭️</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
 }
 
-const theme = require('../theme').default;
+const theme_imported = require('../theme').default;
 const { colors } = require('../theme/colors');
 const { typography } = require('../theme/typography');
 const { spacing } = require('../theme/spacing');
@@ -273,6 +336,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.md,
   },
   info: {
     flex: 1,
@@ -288,11 +352,59 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.text.secondary,
   },
+  
+  // Control buttons container
+  controlsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+
+  // Skip buttons
+  controlButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: theme_imported.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 45,
+    minHeight: 45,
+  },
+  controlButtonDisabled: {
+    backgroundColor: colors.disabled,
+    opacity: 0.5,
+  },
+  controlButtonText: {
+    fontSize: 18,
+  },
+
+  // Play button (larger)
+  playButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: theme_imported.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 55,
+    minHeight: 55,
+  },
+  playButtonDisabled: {
+    backgroundColor: colors.disabled,
+    opacity: 0.5,
+  },
+  playButtonText: {
+    fontSize: 20,
+  },
+
+  // Old single button (fallback)
   button: {
     backgroundColor: colors.primary,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme_imported.borderRadius.md,
     minWidth: 50,
     alignItems: 'center',
     justifyContent: 'center',
