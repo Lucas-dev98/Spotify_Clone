@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, ScrollView, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, FlatList, StyleSheet } from 'react-native';
 import Header from '../components/Header';
 import SongItem from '../components/SongItem';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { getArtistTopTracks, searchTracks } from '../services/spotifyApi';
 import { songsArray as localSongs } from '../assets/database/songs';
+import theme from '../theme';
 
 export default function Artist({ route }) {
   const { artist } = route.params ?? {};
@@ -49,29 +51,57 @@ export default function Artist({ route }) {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <Header title={artist?.name ?? 'Artista'} />
       <ScrollView contentContainerStyle={styles.container}>
-        {artist?.banner && <Image source={{ uri: artist.banner }} style={styles.banner} />}
-        <Text style={styles.name}>{artist?.name}</Text>
-
-        <View style={styles.songsHeader}>
-          <Text style={styles.songsTitle}>Músicas</Text>
-        </View>
-
         {loading ? (
-          <ActivityIndicator size="large" color="#1db954" style={{ marginTop: 20 }} />
-        ) : songs.length > 0 ? (
-          <FlatList
-            data={songs}
-            scrollEnabled={false}
-            keyExtractor={(item, i) => String(item?.id || i)}
-            renderItem={({ item, index }) => (
-              <SongItem {...item} index={index} />
-            )}
-          />
+          <>
+            <SkeletonLoader width="100%" height={200} borderRadius={0} />
+            <View style={{ padding: theme.spacing.md }}>
+              <SkeletonLoader width="60%" height={32} borderRadius={theme.spacing.sm} style={{ marginVertical: theme.spacing.md }} />
+              <SkeletonLoader width="100%" height={theme.spacing.xl} borderRadius={theme.spacing.sm} style={{ marginVertical: theme.spacing.sm }} />
+              {[1, 2, 3].map((i) => (
+                <SkeletonLoader key={i} width="100%" height={80} borderRadius={theme.spacing.sm} style={{ marginVertical: theme.spacing.sm }} />
+              ))}
+            </View>
+          </>
         ) : (
-          <Text style={styles.noSongs}>Nenhuma música encontrada</Text>
+          <>
+            {artist?.banner && (
+              <Image 
+                source={{ uri: artist.banner }} 
+                style={styles.banner} 
+              />
+            )}
+            <View style={styles.heroContent}>
+              <Text style={[theme.typography.heading1, { color: theme.colors.textPrimary, textAlign: 'center' }]}>
+                {artist?.name}
+              </Text>
+            </View>
+
+            <View style={styles.songsHeader}>
+              <Text style={[theme.typography.heading3, { color: theme.colors.textPrimary }]}>
+                🎵 Músicas Populares
+              </Text>
+            </View>
+
+            {songs.length > 0 ? (
+              <FlatList
+                data={songs}
+                scrollEnabled={false}
+                keyExtractor={(item, i) => String(item?.id || i)}
+                renderItem={({ item, index }) => (
+                  <SongItem {...item} index={index} />
+                )}
+              />
+            ) : (
+              <View style={styles.noSongsContainer}>
+                <Text style={[theme.typography.body, { color: theme.colors.textSecondary }]}>
+                  Nenhuma música encontrada
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </View>
@@ -79,10 +109,28 @@ export default function Artist({ route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { paddingBottom: 100 },
-  banner: { width: '100%', height: 180, marginBottom: 12 },
-  name: { fontSize: 20, fontWeight: '700', paddingHorizontal: 16, textAlign: 'center', marginBottom: 24 },
-  songsHeader: { paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderColor: '#eee', marginTop: 12 },
-  songsTitle: { fontSize: 16, fontWeight: '700' },
-  noSongs: { textAlign: 'center', color: '#999', marginTop: 20, fontSize: 14 },
+  container: { paddingBottom: theme.spacing.xxl },
+  banner: { 
+    width: '100%', 
+    height: 200, 
+    marginBottom: theme.spacing.md 
+  },
+  heroContent: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.surfaceLight,
+  },
+  songsHeader: { 
+    paddingHorizontal: theme.spacing.md, 
+    paddingVertical: theme.spacing.md,
+    borderTopWidth: 1, 
+    borderTopColor: theme.colors.surfaceLight,
+    marginTop: theme.spacing.md,
+  },
+  noSongsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.xl,
+  },
 });

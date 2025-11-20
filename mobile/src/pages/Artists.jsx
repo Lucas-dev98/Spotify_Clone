@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, ActivityIndicator, Text } from 'react-native';
+import { View, FlatList, Text } from 'react-native';
 import Header from '../components/Header';
 import SingleItem from '../components/SingleItem';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { searchTracks, getNewReleases } from '../services/spotifyApi';
+import theme from '../theme';
 
 export default function Artists() {
   const [artists, setArtists] = useState([]);
@@ -51,26 +53,53 @@ export default function Artists() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <Header title="Artistas" />
-        <ActivityIndicator size="large" color="#1db954" />
+        <View style={{ padding: theme.spacing.md }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <View key={i} style={{ marginBottom: theme.spacing.md }}>
+              <SkeletonLoader width="100%" height={100} borderRadius={theme.spacing.md} />
+            </View>
+          ))}
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <Header title="Artistas" />
-      {error && <Text style={{ color: 'red', padding: 12 }}>Erro: {error}</Text>}
+      {error && (
+        <View style={{ 
+          backgroundColor: theme.colors.error, 
+          padding: theme.spacing.md,
+          margin: theme.spacing.md,
+          borderRadius: theme.spacing.sm,
+        }}>
+          <Text style={{ 
+            color: theme.colors.surface,
+            fontSize: theme.typography.body.fontSize,
+            fontWeight: theme.typography.body.fontWeight,
+          }}>
+            ⚠️ Erro: {error}
+          </Text>
+        </View>
+      )}
       {artists.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ fontSize: 16, color: '#666' }}>Nenhum artista encontrado</Text>
+          <Text style={{ 
+            fontSize: theme.typography.body.fontSize,
+            color: theme.colors.textSecondary,
+          }}>
+            Nenhum artista encontrado
+          </Text>
         </View>
       ) : (
         <FlatList
           data={artists}
           keyExtractor={(i) => String(i.id ?? i.name)}
           renderItem={({ item }) => <SingleItem {...item} idPath="/artist" />}
+          contentContainerStyle={{ paddingBottom: theme.spacing.lg }}
         />
       )}
     </View>
