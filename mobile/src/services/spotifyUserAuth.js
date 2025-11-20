@@ -79,7 +79,7 @@ export async function loginWithSpotifyMobile() {
   try {
     // Configurar OAuth
     const redirectUrl = AuthSession.getRedirectUrl();
-    console.log('Redirect URL:', redirectUrl);
+    console.log('[SpotifyAuth] Redirect URL:', redirectUrl);
 
     const discovery = {
       authorizationEndpoint: 'https://accounts.spotify.com/authorize',
@@ -89,7 +89,7 @@ export async function loginWithSpotifyMobile() {
     const result = await AuthSession.startAsync({
       discovery,
       clientId: CLIENT_ID,
-      clientSecret: process.env.REACT_APP_SPOTIFY_CLIENT_SECRET,
+      // Sem clientSecret para web/mobile (inseguro)
       scopes: SCOPES,
       redirectUrl,
     });
@@ -101,6 +101,7 @@ export async function loginWithSpotifyMobile() {
 
       // Salvar em secure storage
       await saveToken(userToken, expiresIn);
+      console.log('[SpotifyAuth] Mobile login successful');
       return userToken;
     } else if (result.type === 'error') {
       throw new Error(`Auth error: ${result.params?.error}`);
@@ -108,41 +109,44 @@ export async function loginWithSpotifyMobile() {
       throw new Error('Auth cancelled');
     }
   } catch (error) {
-    console.error('Mobile login failed:', error);
+    console.error('[SpotifyAuth] Mobile login failed:', error);
     throw error;
   }
 }
 
 /**
  * Trocar authorization code por access token
+ * WEB ONLY - Não use client_secret na web (é inseguro)
+ * Para produção, use um backend proxy
  */
 async function exchangeCodeForToken(code) {
   try {
-    const clientId = CLIENT_ID;
-    const clientSecret = process.env.REACT_APP_SPOTIFY_CLIENT_SECRET;
-
-    if (!clientSecret) {
-      throw new Error('Client Secret not configured');
-    }
-
+    console.log('[SpotifyAuth] Exchanging code for token...');
+    
+    // Na web, NÃO enviamos secret (evita exposição)
+    // Use um backend para isso em produção
     const response = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
         redirect_uri: REDIRECT_URI,
+        client_id: CLIENT_ID,
+        // NÃO incluir client_secret aqui para web
       }).toString(),
     });
 
     if (!response.ok) {
-      throw new Error(`Token exchange failed: ${response.statusText}`);
+      const error = await response.json();
+      console.error('[SpotifyAuth] Token exchange failed:', error);
+      throw new Error(`Token exchange failed: ${error.error_description || response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('[SpotifyAuth] Token obtained successfully');
     userToken = data.access_token;
     const expiresIn = data.expires_in || 3600;
     tokenExpiresAt = Date.now() + expiresIn * 1000;
@@ -152,16 +156,18 @@ async function exchangeCodeForToken(code) {
 
     return userToken;
   } catch (error) {
-    console.error('Code exchange failed:', error);
+    console.error('[SpotifyAuth] Code exchange failed:', error);
     throw error;
   }
 }
 
 /**
  * Refresh token quando expirar
+ * WEB ONLY - Sem client_secret (inseguro na web)
  */
 export async function refreshUserToken() {
   try {
+    console.log('[SpotifyAuth] Refreshing token...');
     const refreshToken = await AsyncStorage.getItem('spotify_refresh_token');
 
     if (!refreshToken) {
@@ -177,15 +183,18 @@ export async function refreshUserToken() {
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
         client_id: CLIENT_ID,
-        client_secret: process.env.REACT_APP_SPOTIFY_CLIENT_SECRET || '',
+        // Sem client_secret para web
       }).toString(),
     });
 
     if (!response.ok) {
-      throw new Error('Token refresh failed');
+      const error = await response.json();
+      console.error('[SpotifyAuth] Refresh failed:', error);
+      throw new Error(`Token refresh failed: ${error.error_description || response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('[SpotifyAuth] Token refreshed successfully');
     userToken = data.access_token;
     const expiresIn = data.expires_in || 3600;
     tokenExpiresAt = Date.now() + expiresIn * 1000;
