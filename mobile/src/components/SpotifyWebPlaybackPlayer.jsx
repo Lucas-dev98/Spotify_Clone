@@ -71,16 +71,19 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     try {
       setError(null);
       
-      // Check if Web Playback SDK is available
+      // Define callback BEFORE loading SDK
+      window.onSpotifyWebPlaybackSDKReady = setupPlayer;
+      
+      // Check if Web Playback SDK is already loaded
       if (!window.Spotify) {
         console.log('[SpotifyWebPlayback] Loading Spotify Web Playback SDK...');
         
         // Load SDK script
         const script = document.createElement('script');
         script.src = 'https://sdk.scdn.co/spotify-player.js';
-        script.onload = setupPlayer;
         document.head.appendChild(script);
       } else {
+        // SDK already loaded, just setup
         setupPlayer();
       }
     } catch (e) {
@@ -91,79 +94,77 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
 
   function setupPlayer() {
     try {
-      window.onSpotifyWebPlaybackSDKReady = () => {
-        console.log('[SpotifyWebPlayback] SDK ready, initializing player...');
-        
-        // Get access token from Spotify API
-        fetch('https://accounts.spotify.com/api/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': 'Basic ' + btoa('031e7c3ae27041cc8e930273af160b87:181c195a47754e6e88e8ad6e1f7cda6a'),
-          },
-          body: 'grant_type=client_credentials',
-        })
-          .then(response => response.json())
-          .then(data => {
-            const token = data.access_token;
-            
-            const player = new Spotify.Player({
-              name: 'Spotify Clone Player',
-              getOAuthToken: callback => callback(token),
-              volume: 0.5,
-            });
-
-            // Player ready
-            player.addListener('player_state_changed', state => {
-              console.log('[SpotifyWebPlayback] State changed:', state);
-              if (state) {
-                setIsPlaying(!state.paused);
-                setPosition(state.position);
-                setDuration(state.duration);
-
-                if (state.paused && state.position === state.duration) {
-                  console.log('[SpotifyWebPlayback] Track ended');
-                }
-              }
-            });
-
-            player.addListener('initialization_error', ({ message }) => {
-              console.error('[SpotifyWebPlayback] Init error:', message);
-              setError(message);
-            });
-
-            player.addListener('authentication_error', ({ message }) => {
-              console.error('[SpotifyWebPlayback] Auth error:', message);
-              setError('Erro de autenticação: ' + message);
-            });
-
-            player.addListener('account_error', ({ message }) => {
-              console.error('[SpotifyWebPlayback] Account error:', message);
-              setError('Erro de conta: ' + message);
-            });
-
-            player.addListener('playback_error', ({ message }) => {
-              console.error('[SpotifyWebPlayback] Playback error:', message);
-              setError('Erro de reprodução: ' + message);
-            });
-
-            // Connect and store reference
-            player.connect().then(success => {
-              if (success) {
-                console.log('[SpotifyWebPlayback] Player connected!');
-                playerRef.current = player;
-                setIsReady(true);
-              } else {
-                console.error('[SpotifyWebPlayback] Failed to connect player');
-                setError('Falha ao conectar player. Verifique Premium ou Spotify App');
-              }
-            });
-          })
-          .catch(e => {
-            console.error('[SpotifyWebPlayback] Token error:', e);
-            setError('Erro ao obter token');
+      console.log('[SpotifyWebPlayback] SDK ready, initializing player...');
+      
+      // Get access token from Spotify API
+      fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Basic ' + btoa('031e7c3ae27041cc8e930273af160b87:181c195a47754e6e88e8ad6e1f7cda6a'),
+        },
+        body: 'grant_type=client_credentials',
+      })
+        .then(response => response.json())
+        .then(data => {
+          const token = data.access_token;
+          
+          const player = new Spotify.Player({
+            name: 'Spotify Clone Player',
+            getOAuthToken: callback => callback(token),
+            volume: 0.5,
           });
-      };
+
+          // Player ready
+          player.addListener('player_state_changed', state => {
+            console.log('[SpotifyWebPlayback] State changed:', state);
+            if (state) {
+              setIsPlaying(!state.paused);
+              setPosition(state.position);
+              setDuration(state.duration);
+
+              if (state.paused && state.position === state.duration) {
+                console.log('[SpotifyWebPlayback] Track ended');
+              }
+            }
+          });
+
+          player.addListener('initialization_error', ({ message }) => {
+            console.error('[SpotifyWebPlayback] Init error:', message);
+            setError(message);
+          });
+
+          player.addListener('authentication_error', ({ message }) => {
+            console.error('[SpotifyWebPlayback] Auth error:', message);
+            setError('Erro de autenticação: ' + message);
+          });
+
+          player.addListener('account_error', ({ message }) => {
+            console.error('[SpotifyWebPlayback] Account error:', message);
+            setError('Erro de conta: ' + message);
+          });
+
+          player.addListener('playback_error', ({ message }) => {
+            console.error('[SpotifyWebPlayback] Playback error:', message);
+            setError('Erro de reprodução: ' + message);
+          });
+
+          // Connect and store reference
+          player.connect().then(success => {
+            if (success) {
+              console.log('[SpotifyWebPlayback] Player connected!');
+              playerRef.current = player;
+              setIsReady(true);
+            } else {
+              console.error('[SpotifyWebPlayback] Failed to connect player');
+              setError('Falha ao conectar player. Verifique Premium ou Spotify App');
+            }
+          });
+        })
+        .catch(e => {
+          console.error('[SpotifyWebPlayback] Token error:', e);
+          setError('Erro ao obter token');
+        });
     } catch (e) {
       console.error('[SpotifyWebPlayback] Setup error:', e);
       setError('Erro ao configurar player');
