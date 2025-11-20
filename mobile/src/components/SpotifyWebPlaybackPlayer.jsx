@@ -16,6 +16,7 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
   const [position, setPosition] = useState(0);
   const [error, setError] = useState(null);
   const [isReady, setIsReady] = useState(false);
+  const [volume, setVolume] = useState(0.5);
 
   // Initialize SDK once
   useEffect(() => {
@@ -250,26 +251,43 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
   async function skipForward() {
     if (!playerRef.current) return;
     try {
-      const state = await playerRef.current.getCurrentState();
-      if (state) {
-        const pos = Math.min(state.position + SKIP_FORWARD, state.duration);
-        await playerRef.current.seek(pos);
-      }
+      console.log('[WebPlayback] Skip to next track');
+      await playerRef.current.nextTrack();
     } catch (e) {
-      console.warn('[WebPlayback] Skip error:', e);
+      console.warn('[WebPlayback] Next track error:', e);
     }
   }
 
   async function skipBackward() {
     if (!playerRef.current) return;
     try {
-      const state = await playerRef.current.getCurrentState();
-      if (state) {
-        const pos = Math.max(state.position - SKIP_BACKWARD, 0);
-        await playerRef.current.seek(pos);
-      }
+      console.log('[WebPlayback] Skip to previous track');
+      await playerRef.current.previousTrack();
     } catch (e) {
-      console.warn('[WebPlayback] Skip error:', e);
+      console.warn('[WebPlayback] Previous track error:', e);
+    }
+  }
+
+  async function getVolumeLevel() {
+    if (!playerRef.current) return;
+    try {
+      const vol = await playerRef.current.getVolume();
+      console.log('[WebPlayback] Current volume:', vol);
+      setVolume(vol);
+    } catch (e) {
+      console.warn('[WebPlayback] Get volume error:', e);
+    }
+  }
+
+  async function setVolumeLevel(newVolume) {
+    if (!playerRef.current) return;
+    try {
+      const clampedVolume = Math.max(0, Math.min(1, newVolume));
+      console.log('[WebPlayback] Setting volume to:', clampedVolume);
+      await playerRef.current.setVolume(clampedVolume);
+      setVolume(clampedVolume);
+    } catch (e) {
+      console.warn('[WebPlayback] Set volume error:', e);
     }
   }
 
