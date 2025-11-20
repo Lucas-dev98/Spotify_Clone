@@ -1,0 +1,76 @@
+export const songsArray = [
+  {
+    image: 'https://i.scdn.co/image/ab67616d00001e022774b00531d558bc19e12a24',
+    name: 'Última Saudade - Ao Vivo',
+    duration: '02:30',
+    artist: 'Henrique & Juliano',
+    audio: 'https://jornada-fullstack.s3.us-east-2.amazonaws.com/ultima-saudade.mp3',
+    id: 1,
+  },
+  {
+    image: 'https://i.scdn.co/image/ab67616d00001e02af41105c5cd91b28f2cf219d',
+    name: 'Xonei',
+    duration: '02:34',
+    artist: 'Henrique & Juliano',
+    audio: 'https://jornada-fullstack.s3.us-east-2.amazonaws.com/ultima-saudade.mp3',
+    id: 2,
+  },
+  {
+    image: 'https://i.scdn.co/image/ab67616d00001e0209e0b1f5c3d8a2f1e5c3a1b9',
+    name: 'Te Amo Demais',
+    duration: '03:15',
+    artist: 'Henrique & Juliano',
+    audio: 'https://jornada-fullstack.s3.us-east-2.amazonaws.com/ultima-saudade.mp3',
+    id: 3,
+  },
+  {
+    image: 'https://i.scdn.co/image/ab67616d00001e02d8bfb4567b1b5e5bc4da915b',
+    name: 'Oh Garota Eu Quero Você Só Pra Mim',
+    duration: '02:46',
+    artist: 'MC Tuto',
+    audio: 'https://jornada-fullstack.s3.us-east-2.amazonaws.com/barbie.mp3',
+    id: 11,
+  },
+  {
+    image: 'https://i.scdn.co/image/ab67616d00001e02f3c1e7a2b5d8c1f4e9a3b2c6',
+    name: 'Barbie Pink',
+    duration: '02:58',
+    artist: 'MC Tuto',
+    audio: 'https://jornada-fullstack.s3.us-east-2.amazonaws.com/barbie.mp3',
+    id: 12,
+  },
+  {
+    image: 'https://i.scdn.co/image/ab67616d00001e02a1b2c3d4e5f6a7b8c9d0e1f2',
+    name: 'Voltou Pro Bico',
+    duration: '03:05',
+    artist: 'MC Tuto',
+    audio: 'https://jornada-fullstack.s3.us-east-2.amazonaws.com/barbie.mp3',
+    id: 13,
+  },
+  {
+    image: 'https://i.scdn.co/image/ab67616d00001e027e8f9a0b1c2d3e4f5a6b7c8d',
+    name: 'Saudade Vem Me Buscar',
+    duration: '03:22',
+    artist: 'Jorge & Mateus',
+    audio: 'https://jornada-fullstack.s3.us-east-2.amazonaws.com/ultima-saudade.mp3',
+    id: 21,
+  },
+  {
+    image: 'https://i.scdn.co/image/ab67616d00001e029b0a1c2d3e4f5a6b7c8d9e0',
+    name: 'Infiel',
+    duration: '03:18',
+    artist: 'Jorge & Mateus',
+    audio: 'https://jornada-fullstack.s3.us-east-2.amazonaws.com/ultima-saudade.mp3',
+    id: 22,
+  },
+  {
+    image: 'https://i.scdn.co/image/ab67616d00001e021a2b3c4d5e6f7a8b9c0d1e2f',
+    name: 'Cachorro Louco',
+    duration: '02:52',
+    artist: 'Jorge & Mateus',
+    audio: 'https://jornada-fullstack.s3.us-east-2.amazonaws.com/barbie.mp3',
+    id: 23,
+  }
+];
+
+export default songsArray;
