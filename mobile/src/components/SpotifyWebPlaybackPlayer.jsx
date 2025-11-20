@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, ScrollView } from 'react-native';
 import theme from '../theme';
 
-const SKIP_FORWARD = 10000;
-const SKIP_BACKWARD = 10000;
 const CLIENT_ID = '031e7c3ae27041cc8e930273af160b87';
 const CLIENT_SECRET = '181c195a47754e6e88e8ad6e1f7cda6a';
 
@@ -17,6 +15,9 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
   const [error, setError] = useState(null);
   const [isReady, setIsReady] = useState(false);
   const [volume, setVolume] = useState(0.5);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [repeatMode, setRepeatMode] = useState(0);
+  const [shuffle, setShuffle] = useState(false);
 
   // Initialize SDK once
   useEffect(() => {
@@ -46,15 +47,17 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
 
     const interval = setInterval(() => {
       playerRef.current.getCurrentState().then(state => {
-        if (state) {
+        if (state && !isSeeking) {
           setPosition(state.position);
           setDuration(state.duration);
+          setRepeatMode(state.repeat_mode || 0);
+          setShuffle(state.shuffle || false);
         }
       }).catch(() => {});
     }, 500);
 
     return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [isPlaying, isSeeking]);
 
   function initializeSdk() {
     try {
@@ -291,6 +294,36 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     }
   }
 
+  async function seek(positionMs) {
+    if (!playerRef.current) return;
+    try {
+      const clampedPosition = Math.max(0, Math.min(positionMs, duration));
+      console.log('[WebPlayback] Seeking to:', clampedPosition);
+      await playerRef.current.seek(clampedPosition);
+      setPosition(clampedPosition);
+    } catch (e) {
+      console.warn('[WebPlayback] Seek error:', e);
+    }
+  }
+
+  async function handleSeekStart() {
+    setIsSeeking(true);
+  }
+
+  async function handleSeekEnd(positionMs) {
+    setIsSeeking(false);
+    await seek(positionMs);
+  }
+
+  function getRepeatIcon() {
+    switch (repeatMode) {
+      case 0: return '🔁';  // Off
+      case 1: return '🔁';  // Context
+      case 2: return '🔂';  // Track
+      default: return '🔁';
+    }
+  }
+
   function formatTime(ms) {
     if (!ms) return '0:00';
     const secs = Math.floor(ms / 1000);
@@ -299,28 +332,108 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     return `${mins}:${sec.toString().padStart(2, '0')}`;
   }
 
+  // Volume bar component (simple steps 0-10)
+  function renderVolumeBar() {
+    const volumeSteps = 10;
+    const currentStep = Math.round(volume * volumeSteps);
+    
+    return (
+      <View style={styles.volumeContainer}>
+        <Text style={styles.volumeIcon}>🔊</Text>
+        <View style={styles.volumeBar}>
+          {Array.from({ length: volumeSteps }).map((_, index) => (
+            <TouchableOpacity
+              key={index}
+              onPress={() => setVolumeLevel((index + 1) / volumeSteps)}
+              style={[
+                styles.volumeStep,
+                index < currentStep && styles.volumeStepActive,
+              ]}
+            />
+          ))}
+        </View>
+        <Text style={styles.volumePercent}>{Math.round(volume * 100)}%</Text>
+      </View>
+    );
+  }
+
+  // Progress bar component
+  function renderProgressBar() {
+    const progressPercent = duration ? (position / duration) * 100 : 0;
+    
+    return (
+      <View style={styles.progressContainer}>
+        <Text style={styles.timeLabel}>{formatTime(position)}</Text>
+        
+        <View style={styles.progressBar}>
+          <View 
+            style={[
+              styles.progressFill, 
+              { width: `${progressPercent}%` }
+            ]} 
+          />
+          <TouchableOpacity
+            onPress={(e) => {
+              const touchX = e.nativeEvent.locationX;
+              const barWidth = 200; // approximate
+              const newPosition = (touchX / barWidth) * duration;
+              handleSeekEnd(newPosition);
+            }}
+            style={styles.progressBarTouchable}
+          />
+        </View>
+        
+        <Text style={styles.timeLabel}>{formatTime(duration)}</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>🎵 {title}</Text>
-        <Text style={styles.time}>
-          {formatTime(position)} / {formatTime(duration)}
-        </Text>
         {!isReady && <Text style={styles.status}>Conectando...</Text>}
         {error && <Text style={styles.error}>⚠️ {error}</Text>}
       </View>
 
+      {isReady && duration > 0 && renderProgressBar()}
+      
       {isReady ? (
-        <View style={styles.controls}>
-          <TouchableOpacity onPress={skipBackward} style={styles.btn}>
-            <Text style={styles.btnText}>⏮️</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={toggle} style={styles.playBtn}>
-            <Text style={styles.playBtnText}>{isPlaying ? '⏸️' : '▶️'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={skipForward} style={styles.btn}>
-            <Text style={styles.btnText}>⏭️</Text>
-          </TouchableOpacity>
+        <View>
+          <View style={styles.controls}>
+            <TouchableOpacity 
+              onPress={skipBackward} 
+              style={styles.btn}
+              disabled={!isReady}
+            >
+              <Text style={styles.btnText}>⏮️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={toggle} 
+              style={styles.playBtn}
+              disabled={!isReady}
+            >
+              <Text style={styles.playBtnText}>{isPlaying ? '⏸️' : '▶️'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={skipForward} 
+              style={styles.btn}
+              disabled={!isReady}
+            >
+              <Text style={styles.btnText}>⏭️</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {renderVolumeBar()}
+          
+          <View style={styles.extras}>
+            <TouchableOpacity style={styles.extraBtn}>
+              <Text style={styles.extraBtnText}>{shuffle ? '🔀' : '🔀'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.extraBtn}>
+              <Text style={styles.extraBtnText}>{getRepeatIcon()}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : (
         <View style={styles.loadingBtn}>
@@ -343,38 +456,100 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surfaceLight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     gap: spacing.md,
   },
   info: {
-    flex: 1,
-    marginRight: spacing.lg,
+    gap: spacing.xs,
   },
   title: {
     ...typography.bodyMedium,
     fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  time: {
-    ...typography.bodySmall,
-    color: colors.text.secondary,
   },
   status: {
     ...typography.bodySmall,
     color: colors.primary,
-    marginTop: spacing.xs,
   },
   error: {
     ...typography.bodySmall,
     color: colors.error,
-    marginTop: spacing.xs,
   },
+  
+  // Progress bar
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginVertical: spacing.sm,
+  },
+  progressBar: {
+    flex: 1,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 2,
+  },
+  progressBarTouchable: {
+    position: 'absolute',
+    width: '100%',
+    height: 24,
+    top: -10,
+  },
+  timeLabel: {
+    ...typography.bodySmall,
+    color: colors.text.secondary,
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  
+  // Volume bar
+  volumeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: themeObj.borderRadius.sm,
+  },
+  volumeIcon: {
+    fontSize: 16,
+    minWidth: 24,
+  },
+  volumeBar: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 2,
+    alignItems: 'center',
+  },
+  volumeStep: {
+    flex: 1,
+    height: 3,
+    backgroundColor: colors.border,
+    borderRadius: 1.5,
+  },
+  volumeStepActive: {
+    backgroundColor: colors.primary,
+  },
+  volumePercent: {
+    ...typography.bodySmall,
+    color: colors.text.secondary,
+    minWidth: 35,
+    textAlign: 'right',
+  },
+  
+  // Controls
   controls: {
     flexDirection: 'row',
     gap: spacing.sm,
+    justifyContent: 'center',
   },
   btn: {
     backgroundColor: colors.primary,
@@ -402,6 +577,29 @@ const styles = StyleSheet.create({
   playBtnText: {
     fontSize: 20,
   },
+  
+  // Extras (shuffle, repeat)
+  extras: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+  },
+  extraBtn: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: themeObj.borderRadius.sm,
+    backgroundColor: colors.surface,
+    minWidth: 40,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  extraBtnText: {
+    fontSize: 16,
+  },
+  
+  // Loading
   loadingBtn: {
     backgroundColor: colors.disabled,
     paddingVertical: spacing.md,
