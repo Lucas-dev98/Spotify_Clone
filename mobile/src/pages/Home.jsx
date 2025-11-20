@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, View, ActivityIndicator, Text } from 'react-native';
 import Header from '../components/Header';
 import Main from '../components/Main';
+import SpotifyLogin from '../components/SpotifyLogin';
+import { useAuth } from '../context/AuthContext';
 import { getNewReleases, searchTracks } from '../services/spotifyApi';
 import { artistArray as localArtists } from '../assets/database/artists';
 import { songsArray as localSongs } from '../assets/database/songs';
@@ -11,10 +13,37 @@ import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 
 export default function Home() {
+  const { userToken, isLoggedIn, loading: authLoading, setAuth } = useAuth();
   const [artists, setArtists] = useState(localArtists);
   const [songs, setSongs] = useState(localSongs);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Show login screen if not authenticated
+  if (!isLoggedIn && !authLoading) {
+    return (
+      <SpotifyLogin 
+        onLoginSuccess={(profile) => {
+          console.log('[Home] Login successful:', profile);
+          setAuth(profile?.access_token || userToken);
+        }}
+        onError={(err) => {
+          console.error('[Home] Login error:', err);
+          setError(err);
+        }}
+      />
+    );
+  }
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: spacing.md, color: colors.text.primary }}>Carregando...</Text>
+      </View>
+    );
+  }
 
   useEffect(() => {
     const fetchData = async () => {

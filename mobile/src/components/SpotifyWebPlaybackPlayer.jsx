@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, ScrollView } from 'react-native';
 import theme from '../theme';
+import { getOAuthTokenForWebPlayback, refreshUserToken } from '../services/spotifyUserAuth';
 
 const CLIENT_ID = '031e7c3ae27041cc8e930273af160b87';
-const CLIENT_SECRET = '181c195a47754e6e88e8ad6e1f7cda6a';
 
-export default function SpotifyWebPlaybackPlayer({ source, title }) {
+export default function SpotifyWebPlaybackPlayer({ source, title, userToken }) {
   const playerRef = useRef(null);
   const deviceIdRef = useRef(null);
   const tokenRef = useRef(null);
@@ -171,31 +171,32 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     try {
       log('info', 'Setting up player');
 
-      // Get token
-      const auth = btoa(CLIENT_ID + ':' + CLIENT_SECRET);
-      const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Basic ' + auth,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'grant_type=client_credentials',
-      });
-
-      if (!tokenResponse.ok) {
-        throw new Error('Failed to get token: ' + tokenResponse.status);
+      // Use user's OAuth token (required for Web Playback SDK)
+      if (!userToken) {
+        throw new Error('User token not available. Please login first.');
       }
 
-      const tokenData = await tokenResponse.json();
-      tokenRef.current = tokenData.access_token;
-      log('info', 'Token obtained', { expiresIn: tokenData.expires_in });
+      tokenRef.current = userToken;
+      log('info', 'Using user OAuth token for Web Playback SDK');
 
-      // Create player
+      // Create player with getOAuthToken callback
       const player = new Spotify.Player({
         name: 'Spotify Clone',
-        getOAuthToken: callback => {
-          log('debug', 'OAuth token requested');
-          callback(tokenRef.current);
+        getOAuthToken: async (callback) => {
+          log('debug', 'OAuth token requested by SDK');
+          try {
+            // Try to get a fresh token
+            const freshToken = await refreshUserToken();
+            if (freshToken) {
+              tokenRef.current = freshToken;
+              callback(freshToken);
+            } else {
+              callback(tokenRef.current);
+            }
+          } catch (e) {
+            log('warn', 'Token refresh failed, using cached token', { message: e.message });
+            callback(tokenRef.current);
+          }
         },
         volume: 0.5,
       });

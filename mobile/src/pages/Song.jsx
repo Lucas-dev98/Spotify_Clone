@@ -3,6 +3,7 @@ import { View, Text, Image, ScrollView, StyleSheet } from 'react-native';
 import Header from '../components/Header';
 import Player from '../components/Player';
 import SpotifyWebPlaybackPlayer from '../components/SpotifyWebPlaybackPlayer';
+import { useAuth } from '../context/AuthContext';
 import theme from '../theme';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -10,6 +11,7 @@ import { spacing } from '../theme/spacing';
 
 export default function Song({ route }) {
   const { song } = route.params ?? {};
+  const { userToken } = useAuth();
 
   // Debug logging
   React.useEffect(() => {
@@ -55,7 +57,11 @@ export default function Song({ route }) {
             <View style={styles.playerContainer}>
               {song.uri && song.uri.startsWith('spotify:track:') ? (
                 // Use Spotify Web Playback for full track
-                <SpotifyWebPlaybackPlayer source={song.uri} title={song.name} />
+                <SpotifyWebPlaybackPlayer 
+                  source={song.uri} 
+                  title={song.name}
+                  userToken={userToken}
+                />
               ) : (
                 // Fallback to HTTP audio (Deezer preview)
                 <Player source={song.audio || song.previewUrl} title={song.name} />

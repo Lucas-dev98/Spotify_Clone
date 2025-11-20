@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
+import { AuthProvider } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import checkSpotifySetup from './src/utils/setupChecker';
 
@@ -14,8 +15,10 @@ export default function App() {
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <AppNavigator />
-    </View>
+    <AuthProvider>
+      <View style={{ flex: 1, backgroundColor: '#fff' }}>
+        <AppNavigator />
+      </View>
+    </AuthProvider>
   );
 }
