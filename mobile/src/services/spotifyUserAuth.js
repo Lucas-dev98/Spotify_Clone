@@ -327,3 +327,11 @@ export async function getCurrentUser() {
     throw error;
   }
 }
+
+/**
+ * Get OAuth token for Web Playback SDK
+ * Wrapper para o Web Playback Player obter token válido
+ */
+export async function getOAuthTokenForWebPlayback() {
+  return await getUserToken();
+}
