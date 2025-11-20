@@ -21,18 +21,24 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
   const [disallows, setDisallows] = useState({});
   const [isAd, setIsAd] = useState(false);
   const [nextTracks, setNextTracks] = useState([]);
+  const [errorType, setErrorType] = useState(null); // 'init', 'auth', 'account', 'playback'
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = useRef(null);
 
   // Initialize SDK once
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    console.log('[WebPlayback] Initializing...');
+    log('info', 'Initializing SDK...');
     initializeSdk();
 
     // Cleanup on unmount
     return () => {
       if (playerRef.current) {
-        console.log('[WebPlayback] Disconnecting player...');
-        playerRef.current.disconnect().catch(e => console.warn('[WebPlayback] Disconnect failed:', e));
+        log('info', 'Disconnecting player');
+        playerRef.current.disconnect().catch(e => log('warn', 'Disconnect failed', e));
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
       }
     };
   }, []);
@@ -62,35 +68,108 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     return () => clearInterval(interval);
   }, [isPlaying, isSeeking]);
 
+  // Structured logging
+  function log(level, message, data = null) {
+    const timestamp = new Date().toLocaleTimeString();
+    const context = data ? ` - ${JSON.stringify(data)}` : '';
+    console.log(`[${timestamp}] [WebPlayback/${level.toUpperCase()}] ${message}${context}`);
+  }
+
+  // Handle SDK errors with user-friendly messages
+  function handleError(type, message, data) {
+    let userMessage = message;
+    let shouldRetry = false;
+    
+    switch (type) {
+      case 'initialization_error':
+        setErrorType('init');
+        userMessage = '❌ Navegador não suporta reprodução. Tente outro navegador (Chrome, Firefox, Safari).';
+        log('error', 'Initialization failed', { message, data });
+        break;
+        
+      case 'authentication_error':
+        setErrorType('auth');
+        userMessage = '🔐 Erro de autenticação. Tente fazer login novamente.';
+        shouldRetry = retryCount < 3;
+        log('error', 'Authentication failed', { message, data, retryCount });
+        break;
+        
+      case 'account_error':
+        setErrorType('account');
+        userMessage = '🎵 Spotify Premium requerido. Faça upgrade para reproduzir músicas completas.';
+        log('error', 'Premium account required', { message, data });
+        break;
+        
+      case 'playback_error':
+        setErrorType('playback');
+        userMessage = '⚠️ Erro ao reproduzir. Tente outra música.';
+        shouldRetry = retryCount < 2;
+        log('error', 'Playback failed', { message, data, retryCount });
+        break;
+        
+      case 'not_ready':
+        userMessage = '📡 Sem conexão com o player. Verifique sua conexão.';
+        log('warn', 'Player not ready', { message, data });
+        break;
+        
+      case 'autoplay_failed':
+        userMessage = '▶️ Clique no botão play para começar (navegador bloqueou autoplay).';
+        log('warn', 'Autoplay blocked by browser', data);
+        break;
+        
+      default:
+        log('error', `Unknown error: ${type}`, { message, data });
+    }
+    
+    setError(userMessage);
+    
+    // Retry logic
+    if (shouldRetry) {
+      const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+      log('info', `Retrying in ${delay}ms`, { attempt: retryCount + 1 });
+      
+      retryTimeoutRef.current = setTimeout(() => {
+        setRetryCount(retryCount + 1);
+        if (type === 'authentication_error') {
+          setupPlayer();
+        } else if (type === 'playback_error') {
+          playTrack();
+        }
+      }, delay);
+    }
+  }
+
   function initializeSdk() {
     try {
       setError(null);
+      setErrorType(null);
+      setRetryCount(0);
 
       // Define callback BEFORE loading SDK
       window.onSpotifyWebPlaybackSDKReady = () => {
-        console.log('[WebPlayback] SDK ready callback');
+        log('info', 'SDK ready callback triggered');
         setupPlayer();
       };
 
       if (!window.Spotify) {
-        console.log('[WebPlayback] Loading SDK...');
+        log('info', 'Loading SDK script');
         const script = document.createElement('script');
         script.src = 'https://sdk.scdn.co/spotify-player.js';
         script.async = true;
         document.head.appendChild(script);
       } else {
-        console.log('[WebPlayback] SDK already loaded');
+        log('info', 'SDK already loaded, setting up player');
         setupPlayer();
       }
     } catch (e) {
-      console.error('[WebPlayback] Init error:', e);
-      setError('Erro na inicialização');
+      log('error', 'Initialization failed', { message: e.message });
+      handleError('initialization_error', e.message, e);
     }
   }
 
   async function setupPlayer() {
     try {
-      console.log('[WebPlayback] Setting up player...');
+      log('info', 'Setting up player');
 
       // Get token
       const auth = btoa(CLIENT_ID + ':' + CLIENT_SECRET);
@@ -109,32 +188,32 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
 
       const tokenData = await tokenResponse.json();
       tokenRef.current = tokenData.access_token;
-      console.log('[WebPlayback] Token obtained');
+      log('info', 'Token obtained', { expiresIn: tokenData.expires_in });
 
       // Create player
       const player = new Spotify.Player({
         name: 'Spotify Clone',
         getOAuthToken: callback => {
-          console.log('[WebPlayback] OAuth token requested');
+          log('debug', 'OAuth token requested');
           callback(tokenRef.current);
         },
         volume: 0.5,
       });
 
-  // Ready event
+      // Ready event
       player.addListener('ready', ({ device_id }) => {
-        console.log('[WebPlayback] Ready! Device ID:', device_id);
+        log('success', 'Player ready!', { device_id });
         deviceIdRef.current = device_id;
         playerRef.current = player;
         setIsReady(true);
 
         // Activate element to allow playback from state transfer
-        player.activateElement().catch(e => console.warn('[WebPlayback] Activate failed:', e));
+        player.activateElement().catch(e => log('warn', 'Activate failed', e));
       });
 
       // Not ready event
       player.addListener('not_ready', ({ device_id }) => {
-        console.error('[WebPlayback] Not ready:', device_id);
+        log('warn', 'Player not ready', { device_id });
         setError('Player não está pronto');
       });
 
@@ -165,42 +244,40 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
 
       // Errors
       player.addListener('initialization_error', ({ message }) => {
-        console.error('[WebPlayback] Init error:', message);
-        setError('Inicialização: ' + message);
+        handleError('initialization_error', message);
       });
 
       player.addListener('authentication_error', ({ message }) => {
-        console.error('[WebPlayback] Auth error:', message);
-        setError('Autenticação: ' + message);
+        handleError('authentication_error', message);
       });
 
       player.addListener('account_error', ({ message }) => {
-        console.error('[WebPlayback] Account error:', message);
-        setError('Premium requerido: ' + message);
+        handleError('account_error', message);
       });
 
       player.addListener('playback_error', ({ message }) => {
-        console.error('[WebPlayback] Playback error:', message);
-        setError('Reprodução: ' + message);
+        handleError('playback_error', message);
+      });
+
+      player.addListener('not_ready', ({ device_id }) => {
+        handleError('not_ready', 'Device not ready', { device_id });
       });
 
       player.addListener('autoplay_failed', () => {
-        console.warn('[WebPlayback] Autoplay failed - user needs to interact');
-        setError('Clique para reproduzir (autoplay bloqueado)');
+        handleError('autoplay_failed', 'Autoplay blocked');
       });
 
       // Connect
-      console.log('[WebPlayback] Connecting...');
+      log('info', 'Connecting player');
       const success = await player.connect();
       if (success) {
-        console.log('[WebPlayback] Player connected!');
+        log('success', 'Player connected');
       } else {
-        console.error('[WebPlayback] Failed to connect');
-        setError('Falha ao conectar. Verificar Premium?');
+        handleError('connection_failed', 'Failed to connect to Spotify', { attempted: 'connection' });
       }
     } catch (e) {
-      console.error('[WebPlayback] Setup error:', e);
-      setError('Erro: ' + e.message);
+      log('error', 'Setup failed', { message: e.message, stack: e.stack });
+      handleError('setup_error', 'Setup error: ' + e.message, e);
     }
   }
 
@@ -225,29 +302,29 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
         }),
       });
 
-      console.log('[WebPlayback] Play response:', response.status);
+      log('debug', 'Play API response', { status: response.status });
 
       if (response.status === 204) {
-        console.log('[WebPlayback] Playing!');
+        log('success', 'Track started playing');
         setError(null);
       } else if (response.status === 401) {
-        setError('Token expirado');
+        handleError('playback_error', 'Token expirado - tente recarregar', { status: 401 });
       } else if (response.status === 403) {
         const data = await response.json();
-        setError('Premium ou device inválido');
+        handleError('playback_error', 'Device ou Premium inválido', { status: 403, data });
       } else {
-        setError('Erro: ' + response.status);
+        handleError('playback_error', `API error ${response.status}`, { status: response.status });
       }
     } catch (e) {
-      console.error('[WebPlayback] Play error:', e);
-      setError('Erro ao reproduzir');
+      log('error', 'Play request failed', { message: e.message });
+      handleError('playback_error', e.message, e);
     }
   }
 
   async function toggle() {
     if (!playerRef.current) return;
     try {
-      console.log('[WebPlayback] Toggle play/pause');
+      log('debug', 'Toggle play/pause');
       // Use togglePlay() if available, otherwise use pause/resume
       if (playerRef.current.togglePlay) {
         await playerRef.current.togglePlay();
@@ -257,28 +334,28 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
         await playerRef.current.resume();
       }
     } catch (e) {
-      console.error('[WebPlayback] Toggle error:', e);
-      setError('Erro ao alternar: ' + e.message);
+      log('error', 'Toggle failed', { message: e.message });
+      handleError('playback_error', 'Erro ao alternar: ' + e.message, e);
     }
   }
 
   async function skipForward() {
     if (!playerRef.current) return;
     try {
-      console.log('[WebPlayback] Skip to next track');
+      log('debug', 'Skip to next track');
       await playerRef.current.nextTrack();
     } catch (e) {
-      console.warn('[WebPlayback] Next track error:', e);
+      log('warn', 'Next track failed', { message: e.message });
     }
   }
 
   async function skipBackward() {
     if (!playerRef.current) return;
     try {
-      console.log('[WebPlayback] Skip to previous track');
+      log('debug', 'Skip to previous track');
       await playerRef.current.previousTrack();
     } catch (e) {
-      console.warn('[WebPlayback] Previous track error:', e);
+      log('warn', 'Previous track failed', { message: e.message });
     }
   }
 
@@ -286,10 +363,10 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     if (!playerRef.current) return;
     try {
       const vol = await playerRef.current.getVolume();
-      console.log('[WebPlayback] Current volume:', vol);
+      log('debug', 'Current volume fetched', { volume: vol });
       setVolume(vol);
     } catch (e) {
-      console.warn('[WebPlayback] Get volume error:', e);
+      log('warn', 'Get volume failed', { message: e.message });
     }
   }
 
@@ -297,7 +374,7 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     if (!playerRef.current) return;
     try {
       const clampedVolume = Math.max(0, Math.min(1, newVolume));
-      console.log('[WebPlayback] Setting volume to:', clampedVolume);
+      log('debug', 'Setting volume', { volume: clampedVolume });
       await playerRef.current.setVolume(clampedVolume);
       setVolume(clampedVolume);
     } catch (e) {
@@ -309,11 +386,11 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     if (!playerRef.current) return;
     try {
       const clampedPosition = Math.max(0, Math.min(positionMs, duration));
-      console.log('[WebPlayback] Seeking to:', clampedPosition);
+      log('debug', 'Seeking', { position: clampedPosition, duration });
       await playerRef.current.seek(clampedPosition);
       setPosition(clampedPosition);
     } catch (e) {
-      console.warn('[WebPlayback] Seek error:', e);
+      log('warn', 'Seek failed', { message: e.message });
     }
   }
 
@@ -323,7 +400,7 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
       const nextMode = (repeatMode + 1) % 3;
       const repeatValue = nextMode === 0 ? 'off' : nextMode === 1 ? 'context' : 'track';
       
-      console.log('[WebPlayback] Setting repeat to:', repeatValue);
+      log('debug', 'Toggle repeat', { nextMode, repeatValue });
       
       const response = await fetch(`https://api.spotify.com/v1/me/player/repeat?state=${repeatValue}&device_id=${deviceIdRef.current}`, {
         method: 'PUT',
@@ -333,17 +410,19 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
       });
       
       if (!response.ok) {
-        console.error('[WebPlayback] Repeat toggle failed:', response.status);
+        log('warn', 'Repeat toggle failed', { status: response.status });
+      } else {
+        log('success', 'Repeat mode changed', { repeatValue });
       }
     } catch (e) {
-      console.warn('[WebPlayback] Toggle repeat error:', e);
+      log('warn', 'Toggle repeat failed', { message: e.message });
     }
   }
 
   async function toggleShuffle() {
     try {
       const newShuffle = !shuffle;
-      console.log('[WebPlayback] Setting shuffle to:', newShuffle);
+      log('debug', 'Toggle shuffle', { newShuffle });
       
       const response = await fetch(`https://api.spotify.com/v1/me/player/shuffle?state=${newShuffle}&device_id=${deviceIdRef.current}`, {
         method: 'PUT',
@@ -353,10 +432,12 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
       });
       
       if (!response.ok) {
-        console.error('[WebPlayback] Shuffle toggle failed:', response.status);
+        log('warn', 'Shuffle toggle failed', { status: response.status });
+      } else {
+        log('success', 'Shuffle mode changed', { shuffle: newShuffle });
       }
     } catch (e) {
-      console.warn('[WebPlayback] Toggle shuffle error:', e);
+      log('warn', 'Toggle shuffle failed', { message: e.message });
     }
   }
 
