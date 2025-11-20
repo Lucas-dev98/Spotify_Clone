@@ -18,6 +18,9 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
   const [isSeeking, setIsSeeking] = useState(false);
   const [repeatMode, setRepeatMode] = useState(0);
   const [shuffle, setShuffle] = useState(false);
+  const [disallows, setDisallows] = useState({});
+  const [isAd, setIsAd] = useState(false);
+  const [nextTracks, setNextTracks] = useState([]);
 
   // Initialize SDK once
   useEffect(() => {
@@ -141,14 +144,22 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
           console.log('[WebPlayback] State changed - paused:', state.paused);
           console.log('[WebPlayback] Duration:', state.duration);
           console.log('[WebPlayback] Position:', state.position);
+          console.log('[WebPlayback] Disallows:', state.disallows);
           
           if (state.track_window && state.track_window.current_track) {
-            console.log('[WebPlayback] Track:', state.track_window.current_track.name);
+            const track = state.track_window.current_track;
+            console.log('[WebPlayback] Track:', track.name);
+            console.log('[WebPlayback] Type:', track.type); // "track", "episode", "ad"
+            setIsAd(track.type === 'ad');
+            setNextTracks(state.track_window.next_tracks || []);
           }
           
           setIsPlaying(!state.paused);
           setPosition(state.position);
           setDuration(state.duration);
+          setRepeatMode(state.repeat_mode || 0);
+          setShuffle(state.shuffle || false);
+          setDisallows(state.disallows || {});
         }
       });
 
@@ -306,21 +317,46 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     }
   }
 
-  async function handleSeekStart() {
-    setIsSeeking(true);
+  async function toggleRepeat() {
+    try {
+      // repeatMode: 0 -> off, 1 -> context, 2 -> track
+      const nextMode = (repeatMode + 1) % 3;
+      const repeatValue = nextMode === 0 ? 'off' : nextMode === 1 ? 'context' : 'track';
+      
+      console.log('[WebPlayback] Setting repeat to:', repeatValue);
+      
+      const response = await fetch(`https://api.spotify.com/v1/me/player/repeat?state=${repeatValue}&device_id=${deviceIdRef.current}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + tokenRef.current,
+        },
+      });
+      
+      if (!response.ok) {
+        console.error('[WebPlayback] Repeat toggle failed:', response.status);
+      }
+    } catch (e) {
+      console.warn('[WebPlayback] Toggle repeat error:', e);
+    }
   }
 
-  async function handleSeekEnd(positionMs) {
-    setIsSeeking(false);
-    await seek(positionMs);
-  }
-
-  function getRepeatIcon() {
-    switch (repeatMode) {
-      case 0: return '🔁';  // Off
-      case 1: return '🔁';  // Context
-      case 2: return '🔂';  // Track
-      default: return '🔁';
+  async function toggleShuffle() {
+    try {
+      const newShuffle = !shuffle;
+      console.log('[WebPlayback] Setting shuffle to:', newShuffle);
+      
+      const response = await fetch(`https://api.spotify.com/v1/me/player/shuffle?state=${newShuffle}&device_id=${deviceIdRef.current}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + tokenRef.current,
+        },
+      });
+      
+      if (!response.ok) {
+        console.error('[WebPlayback] Shuffle toggle failed:', response.status);
+      }
+    } catch (e) {
+      console.warn('[WebPlayback] Toggle shuffle error:', e);
     }
   }
 
@@ -330,6 +366,39 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     const mins = Math.floor(secs / 60);
     const sec = secs % 60;
     return `${mins}:${sec.toString().padStart(2, '0')}`;
+  }
+
+  function getRepeatIcon() {
+    switch (repeatMode) {
+      case 0: return '🔁';  // Off
+      case 1: return '🔁';  // Context repeat
+      case 2: return '🔂';  // Track repeat
+      default: return '🔁';
+    }
+  }
+
+  // Next tracks queue component
+  function renderQueue() {
+    if (!nextTracks || nextTracks.length === 0) return null;
+    
+    return (
+      <View style={styles.queueContainer}>
+        <Text style={styles.queueTitle}>Próximas</Text>
+        {nextTracks.slice(0, 3).map((track, index) => (
+          <View key={index} style={styles.queueItem}>
+            <Text style={styles.queueItemNumber}>{index + 1}</Text>
+            <View style={styles.queueItemInfo}>
+              <Text style={styles.queueItemName} numberOfLines={1}>
+                {track.name}
+              </Text>
+              <Text style={styles.queueItemArtist} numberOfLines={1}>
+                {track.artists?.[0]?.name || 'Desconhecido'}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
   }
 
   // Volume bar component (simple steps 0-10)
@@ -399,26 +468,26 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
       {isReady && duration > 0 && renderProgressBar()}
       
       {isReady ? (
-        <View>
+        <ScrollView style={styles.playerContent}>
           <View style={styles.controls}>
             <TouchableOpacity 
               onPress={skipBackward} 
-              style={styles.btn}
-              disabled={!isReady}
+              style={[styles.btn, disallows.skipping_prev && styles.btnDisabled]}
+              disabled={disallows.skipping_prev}
             >
               <Text style={styles.btnText}>⏮️</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               onPress={toggle} 
-              style={styles.playBtn}
-              disabled={!isReady}
+              style={[styles.playBtn, isAd && styles.btnDisabled]}
+              disabled={isAd}
             >
               <Text style={styles.playBtnText}>{isPlaying ? '⏸️' : '▶️'}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               onPress={skipForward} 
-              style={styles.btn}
-              disabled={!isReady}
+              style={[styles.btn, disallows.skipping_next && styles.btnDisabled]}
+              disabled={disallows.skipping_next}
             >
               <Text style={styles.btnText}>⏭️</Text>
             </TouchableOpacity>
@@ -427,14 +496,28 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
           {renderVolumeBar()}
           
           <View style={styles.extras}>
-            <TouchableOpacity style={styles.extraBtn}>
-              <Text style={styles.extraBtnText}>{shuffle ? '🔀' : '🔀'}</Text>
+            <TouchableOpacity 
+              style={[styles.extraBtn, shuffle && styles.extraBtnActive]}
+              onPress={toggleShuffle}
+            >
+              <Text style={styles.extraBtnText}>🔀</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.extraBtn}>
+            <TouchableOpacity 
+              style={[styles.extraBtn, repeatMode > 0 && styles.extraBtnActive]}
+              onPress={toggleRepeat}
+            >
               <Text style={styles.extraBtnText}>{getRepeatIcon()}</Text>
             </TouchableOpacity>
           </View>
-        </View>
+          
+          {isAd && (
+            <View style={styles.adContainer}>
+              <Text style={styles.adText}>📢 Anúncio em reprodução</Text>
+            </View>
+          )}
+          
+          {renderQueue()}
+        </ScrollView>
       ) : (
         <View style={styles.loadingBtn}>
           <Text style={styles.loadingText}>⟳</Text>
@@ -456,6 +539,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surfaceLight,
+    gap: spacing.md,
+    maxHeight: 500,
+  },
+  playerContent: {
     gap: spacing.md,
   },
   info: {
@@ -561,6 +648,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  btnDisabled: {
+    backgroundColor: colors.disabled,
+    opacity: 0.5,
+  },
   btnText: {
     fontSize: 18,
   },
@@ -595,8 +686,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  extraBtnActive: {
+    backgroundColor: colors.primary,
+  },
   extraBtnText: {
     fontSize: 16,
+  },
+  
+  // Ad indicator
+  adContainer: {
+    backgroundColor: colors.error,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: themeObj.borderRadius.sm,
+    alignItems: 'center',
+  },
+  adText: {
+    ...typography.bodySmall,
+    color: colors.text.onDark,
+    fontWeight: '600',
+  },
+  
+  // Queue
+  queueContainer: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  queueTitle: {
+    ...typography.bodyMedium,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+  },
+  queueItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  queueItemNumber: {
+    ...typography.bodySmall,
+    color: colors.text.secondary,
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  queueItemInfo: {
+    flex: 1,
+  },
+  queueItemName: {
+    ...typography.bodySmall,
+    color: colors.text.primary,
+    fontWeight: '500',
+  },
+  queueItemArtist: {
+    ...typography.bodySmall,
+    color: colors.text.secondary,
+    fontSize: 12,
   },
   
   // Loading
