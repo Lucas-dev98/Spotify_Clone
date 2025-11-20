@@ -6,13 +6,13 @@ import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 
-export default function SongItem({ image, name, duration, artist, audio, previewUrl, id, index }) {
+export default function SongItem({ image, name, duration, artist, audio, previewUrl, id, index, uri }) {
   const navigation = useNavigation();
 
   return (
     <TouchableOpacity 
       style={styles.item} 
-      onPress={() => navigation.navigate('Song', { song: { image, name, duration, artist, audio, previewUrl, id } })}
+      onPress={() => navigation.navigate('Song', { song: { image, name, duration, artist, audio, previewUrl, id, uri } })}
       activeOpacity={0.7}
     >
       <View style={styles.left}>

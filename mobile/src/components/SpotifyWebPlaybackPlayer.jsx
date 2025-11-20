@@ -20,6 +20,11 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
   const [isReady, setIsReady] = useState(false);
   const positionIntervalRef = useRef(null);
 
+  // Log when source changes
+  useEffect(() => {
+    console.log('[SpotifyWebPlayback] Source changed:', source);
+  }, [source]);
+
   // Initialize Spotify Web Playback SDK
   useEffect(() => {
     if (Platform.OS !== 'web') return;

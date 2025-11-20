@@ -11,6 +11,17 @@ import { spacing } from '../theme/spacing';
 export default function Song({ route }) {
   const { song } = route.params ?? {};
 
+  // Debug logging
+  React.useEffect(() => {
+    console.log('[Song] Loaded with:', {
+      name: song?.name,
+      hasUri: !!song?.uri,
+      uri: song?.uri,
+      hasAudio: !!song?.audio,
+      audio: song?.audio,
+    });
+  }, [song]);
+
   if (!song) {
     return (
       <View style={styles.container}>
