@@ -2,223 +2,217 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import theme from '../theme';
 
-// Skip constants (in milliseconds)
-const SKIP_FORWARD = 10000;  // 10 seconds
-const SKIP_BACKWARD = 10000; // 10 seconds
+const SKIP_FORWARD = 10000;
+const SKIP_BACKWARD = 10000;
+const CLIENT_ID = '031e7c3ae27041cc8e930273af160b87';
+const CLIENT_SECRET = '181c195a47754e6e88e8ad6e1f7cda6a';
 
-/**
- * SpotifyWebPlaybackPlayer
- * Uses Spotify Web Playback SDK for full track playback
- * Requires: Spotify Premium OR Spotify app installed + URI format
- */
 export default function SpotifyWebPlaybackPlayer({ source, title }) {
   const playerRef = useRef(null);
+  const deviceIdRef = useRef(null);
+  const tokenRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [error, setError] = useState(null);
   const [isReady, setIsReady] = useState(false);
-  const positionIntervalRef = useRef(null);
 
-  // Log when source changes
-  useEffect(() => {
-    console.log('[SpotifyWebPlayback] Source changed:', source);
-  }, [source]);
-
-  // Initialize Spotify Web Playback SDK
+  // Initialize SDK once
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    
-    initializeSpotifyPlayer();
-    
-    return () => {
-      if (positionIntervalRef.current) {
-        clearInterval(positionIntervalRef.current);
-      }
-    };
+    console.log('[WebPlayback] Initializing...');
+    initializeSdk();
   }, []);
 
-  // Load track when source changes
+  // Load track when source or player ready changes
   useEffect(() => {
-    if (!source || !playerRef.current || !isReady) return;
-    
-    loadTrack();
+    if (!source || !isReady || !playerRef.current) return;
+    console.log('[WebPlayback] Loading track:', source);
+    playTrack();
   }, [source, isReady]);
 
-  // Update position
+  // Update position while playing
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || !playerRef.current) return;
 
-    positionIntervalRef.current = setInterval(() => {
-      if (playerRef.current) {
-        playerRef.current.getCurrentState().then(state => {
-          if (state) {
-            setPosition(state.position);
-            setDuration(state.duration);
-          }
-        });
-      }
+    const interval = setInterval(() => {
+      playerRef.current.getCurrentState().then(state => {
+        if (state) {
+          setPosition(state.position);
+          setDuration(state.duration);
+        }
+      }).catch(() => {});
     }, 500);
 
-    return () => {
-      if (positionIntervalRef.current) {
-        clearInterval(positionIntervalRef.current);
-      }
-    };
+    return () => clearInterval(interval);
   }, [isPlaying]);
 
-  async function initializeSpotifyPlayer() {
+  function initializeSdk() {
     try {
       setError(null);
-      
+
       // Define callback BEFORE loading SDK
-      window.onSpotifyWebPlaybackSDKReady = setupPlayer;
-      
-      // Check if Web Playback SDK is already loaded
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        console.log('[WebPlayback] SDK ready callback');
+        setupPlayer();
+      };
+
       if (!window.Spotify) {
-        console.log('[SpotifyWebPlayback] Loading Spotify Web Playback SDK...');
-        
-        // Load SDK script
+        console.log('[WebPlayback] Loading SDK...');
         const script = document.createElement('script');
         script.src = 'https://sdk.scdn.co/spotify-player.js';
+        script.async = true;
         document.head.appendChild(script);
       } else {
-        // SDK already loaded, just setup
+        console.log('[WebPlayback] SDK already loaded');
         setupPlayer();
       }
     } catch (e) {
-      console.error('[SpotifyWebPlayback] Init error:', e);
-      setError('Erro ao inicializar player');
+      console.error('[WebPlayback] Init error:', e);
+      setError('Erro na inicialização');
     }
   }
 
-  function setupPlayer() {
+  async function setupPlayer() {
     try {
-      console.log('[SpotifyWebPlayback] SDK ready, initializing player...');
-      
-      // Get access token from Spotify API
-      fetch('https://accounts.spotify.com/api/token', {
+      console.log('[WebPlayback] Setting up player...');
+
+      // Get token
+      const auth = btoa(CLIENT_ID + ':' + CLIENT_SECRET);
+      const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
         method: 'POST',
         headers: {
+          'Authorization': 'Basic ' + auth,
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Basic ' + btoa('031e7c3ae27041cc8e930273af160b87:181c195a47754e6e88e8ad6e1f7cda6a'),
         },
         body: 'grant_type=client_credentials',
-      })
-        .then(response => response.json())
-        .then(data => {
-          const token = data.access_token;
-          
-          const player = new Spotify.Player({
-            name: 'Spotify Clone Player',
-            getOAuthToken: callback => callback(token),
-            volume: 0.5,
-          });
+      });
 
-          // Player ready
-          player.addListener('player_state_changed', state => {
-            console.log('[SpotifyWebPlayback] State changed:', state);
-            if (state) {
-              setIsPlaying(!state.paused);
-              setPosition(state.position);
-              setDuration(state.duration);
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to get token: ' + tokenResponse.status);
+      }
 
-              if (state.paused && state.position === state.duration) {
-                console.log('[SpotifyWebPlayback] Track ended');
-              }
-            }
-          });
+      const tokenData = await tokenResponse.json();
+      tokenRef.current = tokenData.access_token;
+      console.log('[WebPlayback] Token obtained');
 
-          player.addListener('initialization_error', ({ message }) => {
-            console.error('[SpotifyWebPlayback] Init error:', message);
-            setError(message);
-          });
+      // Create player
+      const player = new Spotify.Player({
+        name: 'Spotify Clone',
+        getOAuthToken: callback => {
+          console.log('[WebPlayback] OAuth token requested');
+          callback(tokenRef.current);
+        },
+        volume: 0.5,
+      });
 
-          player.addListener('authentication_error', ({ message }) => {
-            console.error('[SpotifyWebPlayback] Auth error:', message);
-            setError('Erro de autenticação: ' + message);
-          });
+      // Ready event
+      player.addListener('ready', ({ device_id }) => {
+        console.log('[WebPlayback] Ready! Device ID:', device_id);
+        deviceIdRef.current = device_id;
+        playerRef.current = player;
+        setIsReady(true);
+      });
 
-          player.addListener('account_error', ({ message }) => {
-            console.error('[SpotifyWebPlayback] Account error:', message);
-            setError('Erro de conta: ' + message);
-          });
+      // Not ready event
+      player.addListener('not_ready', ({ device_id }) => {
+        console.error('[WebPlayback] Not ready:', device_id);
+        setError('Player não está pronto');
+      });
 
-          player.addListener('playback_error', ({ message }) => {
-            console.error('[SpotifyWebPlayback] Playback error:', message);
-            setError('Erro de reprodução: ' + message);
-          });
+      // State changed
+      player.addListener('player_state_changed', state => {
+        if (state) {
+          console.log('[WebPlayback] State changed - paused:', state.paused);
+          setIsPlaying(!state.paused);
+          setPosition(state.position);
+          setDuration(state.duration);
+        }
+      });
 
-          // Connect and store reference
-          player.connect().then(success => {
-            if (success) {
-              console.log('[SpotifyWebPlayback] Player connected!');
-              playerRef.current = player;
-              setIsReady(true);
-            } else {
-              console.error('[SpotifyWebPlayback] Failed to connect player');
-              setError('Falha ao conectar player. Verifique Premium ou Spotify App');
-            }
-          });
-        })
-        .catch(e => {
-          console.error('[SpotifyWebPlayback] Token error:', e);
-          setError('Erro ao obter token');
-        });
+      // Errors
+      player.addListener('initialization_error', ({ message }) => {
+        console.error('[WebPlayback] Init error:', message);
+        setError('Inicialização: ' + message);
+      });
+
+      player.addListener('authentication_error', ({ message }) => {
+        console.error('[WebPlayback] Auth error:', message);
+        setError('Autenticação: ' + message);
+      });
+
+      player.addListener('account_error', ({ message }) => {
+        console.error('[WebPlayback] Account error:', message);
+        setError('Premium requerido: ' + message);
+      });
+
+      player.addListener('playback_error', ({ message }) => {
+        console.error('[WebPlayback] Playback error:', message);
+        setError('Reprodução: ' + message);
+      });
+
+      player.addListener('autoplay_failed', () => {
+        console.warn('[WebPlayback] Autoplay failed');
+        setError('Clique para reproduzir (autoplay bloqueado)');
+      });
+
+      // Connect
+      console.log('[WebPlayback] Connecting...');
+      const success = await player.connect();
+      if (success) {
+        console.log('[WebPlayback] Player connected!');
+      } else {
+        console.error('[WebPlayback] Failed to connect');
+        setError('Falha ao conectar. Verificar Premium?');
+      }
     } catch (e) {
-      console.error('[SpotifyWebPlayback] Setup error:', e);
-      setError('Erro ao configurar player');
+      console.error('[WebPlayback] Setup error:', e);
+      setError('Erro: ' + e.message);
     }
   }
 
-  async function loadTrack() {
+  async function playTrack() {
     try {
       if (!source.startsWith('spotify:track:')) {
-        setError('URI inválido. Deve ser: spotify:track:xxxxx');
+        setError('URI inválido');
         return;
       }
 
-      console.log('[SpotifyWebPlayback] Loading track:', source);
-      
-      // Get current player token
-      playerRef.current.getCurrentState().then(async state => {
-        if (state) {
-          // Play track
-          const response = await fetch(`https://api.spotify.com/v1/me/player/play`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${state.token}`,
-            },
-            body: JSON.stringify({
-              uris: [source],
-              position_ms: 0,
-            }),
-          });
+      console.log('[WebPlayback] Playing:', source);
 
-          if (response.ok) {
-            console.log('[SpotifyWebPlayback] Track loaded and playing');
-            setIsPlaying(true);
-            setError(null);
-          } else {
-            const errorData = await response.json();
-            console.error('[SpotifyWebPlayback] Play error:', errorData);
-            setError('Erro ao reproduzir: ' + errorData.error.message);
-          }
-        }
+      const response = await fetch('https://api.spotify.com/v1/me/player/play', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + tokenRef.current,
+        },
+        body: JSON.stringify({
+          device_id: deviceIdRef.current,
+          uris: [source],
+        }),
       });
+
+      console.log('[WebPlayback] Play response:', response.status);
+
+      if (response.status === 204) {
+        console.log('[WebPlayback] Playing!');
+        setError(null);
+      } else if (response.status === 401) {
+        setError('Token expirado');
+      } else if (response.status === 403) {
+        const data = await response.json();
+        setError('Premium ou device inválido');
+      } else {
+        setError('Erro: ' + response.status);
+      }
     } catch (e) {
-      console.error('[SpotifyWebPlayback] Load error:', e);
-      setError('Erro ao carregar música');
+      console.error('[WebPlayback] Play error:', e);
+      setError('Erro ao reproduzir');
     }
   }
 
   async function toggle() {
-    if (!playerRef.current) {
-      setError('Player não está pronto');
-      return;
-    }
-
+    if (!playerRef.current) return;
     try {
       if (isPlaying) {
         await playerRef.current.pause();
@@ -226,38 +220,33 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
         await playerRef.current.resume();
       }
     } catch (e) {
-      console.error('[SpotifyWebPlayback] Toggle error:', e);
-      setError('Erro ao alternar reprodução');
+      console.error('[WebPlayback] Toggle error:', e);
     }
   }
 
   async function skipForward() {
     if (!playerRef.current) return;
-    
     try {
       const state = await playerRef.current.getCurrentState();
       if (state) {
-        const newPosition = Math.min(state.position + SKIP_FORWARD, state.duration);
-        await playerRef.current.seek(newPosition);
-        setPosition(newPosition);
+        const pos = Math.min(state.position + SKIP_FORWARD, state.duration);
+        await playerRef.current.seek(pos);
       }
     } catch (e) {
-      console.warn('[SpotifyWebPlayback] Skip forward error:', e);
+      console.warn('[WebPlayback] Skip error:', e);
     }
   }
 
   async function skipBackward() {
     if (!playerRef.current) return;
-    
     try {
       const state = await playerRef.current.getCurrentState();
       if (state) {
-        const newPosition = Math.max(state.position - SKIP_BACKWARD, 0);
-        await playerRef.current.seek(newPosition);
-        setPosition(newPosition);
+        const pos = Math.max(state.position - SKIP_BACKWARD, 0);
+        await playerRef.current.seek(pos);
       }
     } catch (e) {
-      console.warn('[SpotifyWebPlayback] Skip backward error:', e);
+      console.warn('[WebPlayback] Skip error:', e);
     }
   }
 
@@ -265,59 +254,35 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     if (!ms) return '0:00';
     const secs = Math.floor(ms / 1000);
     const mins = Math.floor(secs / 60);
-    const seconds = secs % 60;
-    return `${mins}:${seconds.toString().padStart(2, '0')}`;
+    const sec = secs % 60;
+    return `${mins}:${sec.toString().padStart(2, '0')}`;
   }
 
   return (
     <View style={styles.container}>
-      {/* Info Section */}
       <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={1}>
-          🎵 {title || 'Spotify Playback'}
-        </Text>
+        <Text style={styles.title} numberOfLines={1}>🎵 {title}</Text>
         <Text style={styles.time}>
           {formatTime(position)} / {formatTime(duration)}
         </Text>
-        {!isReady && (
-          <Text style={styles.status}>Conectando ao Spotify...</Text>
-        )}
-        {error && (
-          <Text style={styles.error}>⚠️ {error}</Text>
-        )}
+        {!isReady && <Text style={styles.status}>Conectando...</Text>}
+        {error && <Text style={styles.error}>⚠️ {error}</Text>}
       </View>
 
-      {/* Controls */}
       {isReady ? (
-        <View style={styles.controlsContainer}>
-          {/* Skip Backward */}
-          <TouchableOpacity
-            onPress={skipBackward}
-            style={[styles.controlButton]}
-          >
-            <Text style={styles.controlButtonText}>⏮️</Text>
+        <View style={styles.controls}>
+          <TouchableOpacity onPress={skipBackward} style={styles.btn}>
+            <Text style={styles.btnText}>⏮️</Text>
           </TouchableOpacity>
-
-          {/* Play/Pause */}
-          <TouchableOpacity
-            onPress={toggle}
-            style={[styles.playButton]}
-          >
-            <Text style={styles.playButtonText}>
-              {isPlaying ? '⏸️' : '▶️'}
-            </Text>
+          <TouchableOpacity onPress={toggle} style={styles.playBtn}>
+            <Text style={styles.playBtnText}>{isPlaying ? '⏸️' : '▶️'}</Text>
           </TouchableOpacity>
-
-          {/* Skip Forward */}
-          <TouchableOpacity
-            onPress={skipForward}
-            style={[styles.controlButton]}
-          >
-            <Text style={styles.controlButtonText}>⏭️</Text>
+          <TouchableOpacity onPress={skipForward} style={styles.btn}>
+            <Text style={styles.btnText}>⏭️</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.loadingButton}>
+        <View style={styles.loadingBtn}>
           <Text style={styles.loadingText}>⟳</Text>
         </View>
       )}
@@ -328,7 +293,7 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
 const { colors } = require('../theme/colors');
 const { typography } = require('../theme/typography');
 const { spacing } = require('../theme/spacing');
-const theme_imported = require('../theme').default;
+const themeObj = require('../theme').default;
 
 const styles = StyleSheet.create({
   container: {
@@ -342,87 +307,71 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
   },
-  
   info: {
     flex: 1,
     marginRight: spacing.lg,
   },
-  
   title: {
     ...typography.bodyMedium,
     fontWeight: '600',
     color: colors.text.primary,
     marginBottom: spacing.xs,
   },
-  
   time: {
     ...typography.bodySmall,
     color: colors.text.secondary,
   },
-  
   status: {
     ...typography.bodySmall,
     color: colors.primary,
     marginTop: spacing.xs,
-    fontWeight: '500',
   },
-  
   error: {
     ...typography.bodySmall,
     color: colors.error,
     marginTop: spacing.xs,
   },
-
-  // Controls
-  controlsContainer: {
+  controls: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     gap: spacing.sm,
   },
-
-  controlButton: {
+  btn: {
     backgroundColor: colors.primary,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: theme_imported.borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: themeObj.borderRadius.md,
     minWidth: 45,
     minHeight: 45,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-
-  controlButtonText: {
+  btnText: {
     fontSize: 18,
   },
-
-  playButton: {
+  playBtn: {
     backgroundColor: colors.primary,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    borderRadius: theme_imported.borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: themeObj.borderRadius.md,
     minWidth: 55,
     minHeight: 55,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-
-  playButtonText: {
+  playBtnText: {
     fontSize: 20,
   },
-
-  loadingButton: {
+  loadingBtn: {
     backgroundColor: colors.disabled,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    borderRadius: theme_imported.borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: themeObj.borderRadius.md,
     minWidth: 55,
     minHeight: 55,
+    justifyContent: 'center',
+    alignItems: 'center',
     opacity: 0.6,
   },
-
   loadingText: {
     fontSize: 20,
   },
