@@ -38,6 +38,23 @@ export default function Player({ source, title }) {
     };
   }, [source]);
 
+  // Auto-play when source changes
+  useEffect(() => {
+    if (!source) return;
+    
+    if (Platform.OS === 'web' && audioElement.current) {
+      setTimeout(() => {
+        if (audioElement.current && audioElement.current.readyState >= 2) {
+          console.log('[Player Web] Starting auto-play...');
+          audioElement.current.play().catch(e => {
+            console.warn('[Player Web] Auto-play failed:', e.message);
+            setError('Toque para reproduzir');
+          });
+        }
+      }, 500);
+    }
+  }, [source]);
+
   // Update progress
   useEffect(() => {
     if (!isPlaying) return;
@@ -106,6 +123,11 @@ export default function Player({ source, title }) {
       audio.onended = () => {
         console.log('[Player Web] Ended');
         setIsPlaying(false);
+        setPosition(audio.duration * 1000);
+      };
+
+      audio.ontimeupdate = () => {
+        setPosition(audio.currentTime * 1000);
       };
 
       audio.onerror = (e) => {
@@ -117,6 +139,14 @@ export default function Player({ source, title }) {
         }
         setIsLoading(false);
       };
+
+      // Auto-play when loaded
+      audio.addEventListener('canplay', () => {
+        if (!isPlaying) {
+          console.log('[Player Web] Auto-playing audio...');
+          audio.play().catch(e => console.warn('[Player Web] Auto-play failed:', e.message));
+        }
+      }, { once: true });
 
       audioElement.current = audio;
     } catch (e) {
