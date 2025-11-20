@@ -22,6 +22,14 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
     if (Platform.OS !== 'web') return;
     console.log('[WebPlayback] Initializing...');
     initializeSdk();
+
+    // Cleanup on unmount
+    return () => {
+      if (playerRef.current) {
+        console.log('[WebPlayback] Disconnecting player...');
+        playerRef.current.disconnect().catch(e => console.warn('[WebPlayback] Disconnect failed:', e));
+      }
+    };
   }, []);
 
   // Load track when source or player ready changes
@@ -106,12 +114,15 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
         volume: 0.5,
       });
 
-      // Ready event
+  // Ready event
       player.addListener('ready', ({ device_id }) => {
         console.log('[WebPlayback] Ready! Device ID:', device_id);
         deviceIdRef.current = device_id;
         playerRef.current = player;
         setIsReady(true);
+
+        // Activate element to allow playback from state transfer
+        player.activateElement().catch(e => console.warn('[WebPlayback] Activate failed:', e));
       });
 
       // Not ready event
@@ -124,6 +135,13 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
       player.addListener('player_state_changed', state => {
         if (state) {
           console.log('[WebPlayback] State changed - paused:', state.paused);
+          console.log('[WebPlayback] Duration:', state.duration);
+          console.log('[WebPlayback] Position:', state.position);
+          
+          if (state.track_window && state.track_window.current_track) {
+            console.log('[WebPlayback] Track:', state.track_window.current_track.name);
+          }
+          
           setIsPlaying(!state.paused);
           setPosition(state.position);
           setDuration(state.duration);
@@ -152,7 +170,7 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
       });
 
       player.addListener('autoplay_failed', () => {
-        console.warn('[WebPlayback] Autoplay failed');
+        console.warn('[WebPlayback] Autoplay failed - user needs to interact');
         setError('Clique para reproduzir (autoplay bloqueado)');
       });
 
@@ -214,13 +232,18 @@ export default function SpotifyWebPlaybackPlayer({ source, title }) {
   async function toggle() {
     if (!playerRef.current) return;
     try {
-      if (isPlaying) {
+      console.log('[WebPlayback] Toggle play/pause');
+      // Use togglePlay() if available, otherwise use pause/resume
+      if (playerRef.current.togglePlay) {
+        await playerRef.current.togglePlay();
+      } else if (isPlaying) {
         await playerRef.current.pause();
       } else {
         await playerRef.current.resume();
       }
     } catch (e) {
       console.error('[WebPlayback] Toggle error:', e);
+      setError('Erro ao alternar: ' + e.message);
     }
   }
 
